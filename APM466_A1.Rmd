@@ -14,27 +14,16 @@ library(jrvFinance)
 library(tidyverse)
 
 
-bond <- read_excel('C:/Users/Zhi/Desktop/data.xlsx')
+bond <- read_excel('data.xlsx')
 bonds <- bond[which(bond$picked=='x'),]
 
 dates <- c("2021-01-18", "2021-01-19", "2021-01-20", "2021-01-21", "2021-01-22", "2021-01-25", "2021-01-26", "2021-01-27", "2021-01-28", "2021-01-29")
 coupons <- c(bonds%>% pull(2))
 m <- c(bonds%>% pull(4))
-mdates<-NULL
+maturitydates<-NULL
 for(i in 1:11){
-  mdates <- append(mdates,as.Date(m[i], format= '%m/%d/%Y'))
+  maturitydates <- append(maturitydates,as.Date(m[i], format= '%m/%d/%Y'))
 }
-price18 <-c(bonds%>% pull(5))
-price19 <- c(bonds%>% pull(6))
-price20 <- c(bonds%>% pull(7))
-price21 <- c(bonds%>% pull(8))
-price22 <- c(bonds%>% pull(9))
-price25 <- c(bonds%>% pull(10))
-price26 <- c(bonds%>% pull(11))
-price27 <- c(bonds%>% pull(12))
-price28 <- c(bonds%>% pull(13))
-price29 <- c(bonds%>% pull(14))
-pricelist <- list(price18, price19, price20, price21, price22, price25, price26, price27, price28, price29)
 
 ```
 
@@ -43,54 +32,53 @@ pricelist <- list(price18, price19, price20, price21, price22, price25, price26,
 ytm <- function(n){
   x <- NULL
   for(i in 1:11){
-    x <- append(x,bond.yield(settle=dates[n],mature=mdates[i],coupon = coupons[i], price = pricelist[[n]][i], redemption_value = 100))
+    x <- append(x,bond.yield(settle=dates[n],coupon = coupons[i], mature=maturitydates[i],price = c(bonds%>% pull(n+4))[i], redemption_value = 100)) # formula to calculate the ytm by jrvfinance
   }
   return(x)
 }
 
-ytmlist <- list()
-for(i in 1:10){
-  ytmlist[[i]] <- ytm(i)
-}
-
-year <- c(0,0.5,1,1.5,2,2.5,3,3.5,4,4.5,5)
-plot(year, ytmlist[[1]], type="l", main = "ytmcurves", xlab ="years" ,ylab = "yield to maturity")
-for( i in 1:10){
-  lines(year, ytmlist[[i]], type = "l", col = i)
-}
-legend("topleft", legend = dates, col = 1:10, lty = 1, cex = 0.8)
+year <- c(0,0.5,1,1.5,2,2.5,3,3.5,4,4.5,5) # since we want calculate yield 0-5 years
+plot(year, ytm(1), type="o", main = "ytmcurves", xlab ="years" ,ylab = "yield to maturity", col=1)
+lines(year, ytm(2), type = "o", col = 2)
+lines(year, ytm(3), type = "o", col = 3)
+lines(year, ytm(4), type = "o", col = 4)
+lines(year, ytm(5), type = "o", col = 5)
+lines(year, ytm(6), type = "o", col = 6)
+lines(year, ytm(7), type = "o", col = 7)
+lines(year, ytm(8), type = "o", col = 8)
+lines(year, ytm(9), type = "o", col = 9)
+lines(year, ytm(10), type = "o", col = 10)
+legend("topright", legend = dates, col = 1:10, lty = 1, cex = 0.6)
 
 ```
 
 ```{r 4b calculate the spot rate}
+
 spotrate <- function(n){
   x <- NULL
-  for(i in 1:11){
+  for(i in 2:11){
+    x[1] <- -log(c(bonds%>% pull(n+4))[1]/(100 + 0.5*100 * coupons[1]))/yearFraction(dates[n], maturitydates[1]) #since the first one will not pay cash flows, so just calculated outside of the loop.
     CF <- 0
-    if (i==1){
-      x[1] <- -log(pricelist[[n]][i]/(100 + 50 * coupons[1]))/yearFraction(dates[n], mdates[1])
-    }
-    else{
-      for (u in 1:(i-1)){
-        p <- 50*coupons[i]*exp(-x[u]*(yearFraction(dates[n], mdates[i])-0.5*(u)))
+    for (u in 1:(i-1)){
+        p <- 0.5*100*coupons[i]*exp(-x[u]*(yearFraction(dates[n], maturitydates[i])-0.5*(u))) # calculate the cash flow of the bond, since the face value is 100, and I calculate p1 outside of the loop, so the mdates here should - 0.5*time.
         CF <- CF + p
-      }
-      x <- append(x,-log((pricelist[[n]][i]-CF)/(100 + 50*coupons[i]))/yearFraction(dates[n], mdates[i]))
     }
+    x <- append(x,-log((c(bonds%>% pull(n+4))[i]-CF)/(100 + 0.5*100*coupons[i]))/yearFraction(dates[n], maturitydates[i])) #price - cash flows, then use the function -log(price/(100+coupon*100))/time to calculate the rate
   }
   return (x)
 }
 
-spotratelist <- list()
-for(i in 1:10){
-  spotratelist[[i]] <- spotrate(i)
-}
-
-plot(year, spotratelist[[1]], type="l", main = "spot rates", xlab ="years" ,ylab = "rates")
-for( i in 1:10){
-  lines(year, spotratelist[[i]], type = "l", col = i)
-}
-legend("topright", legend = dates, col = 1:10, lty = 1, cex = 0.6)
+plot(year, spotrate(1), type="o", main = "spot rates", xlab ="years" ,ylab = "rates", col=1)
+lines(year, spotrate(2), type = "o", col = 2)
+lines(year, spotrate(3), type = "o", col = 3)
+lines(year, spotrate(4), type = "o", col = 4)
+lines(year, spotrate(5), type = "o", col = 5)
+lines(year, spotrate(6), type = "o", col = 6)
+lines(year, spotrate(7), type = "o", col = 7)
+lines(year, spotrate(8), type = "o", col = 8)
+lines(year, spotrate(9), type = "o", col = 9)
+lines(year, spotrate(10), type = "o", col = 10)
+legend("bottomright", legend = dates, col = 1:10, lty = 1, cex = 0.6)
 
 ```
 
@@ -99,67 +87,65 @@ legend("topright", legend = dates, col = 1:10, lty = 1, cex = 0.6)
 library(rlist)
 annualrate <- list()
 for (i in 1:10){
-  annualrate[[i]] <- list.append(spotratelist[[i]][3],spotratelist[[i]][5],spotratelist[[i]][7],spotratelist[[i]][9],spotratelist[[i]][11]) 
-}
+  annualrate[[i]] <- list.append(spotrate(i)[3],spotrate(i)[5],spotrate(i)[7],spotrate(i)[9],spotrate(i)[11]) 
+} # since the spot rate is interest at that spot date, and annual rate is just the day in each year, I calculated spot rate simiannualy, so for annual rate I will just get the code from the spot rate
 
 fwdrate <- function(n){
   x <- NULL
-  for(i in 2:5){
-    x[i-1] <- (annualrate[[n]][i]*i-annualrate[[n]][1])/(i - 1)
+  for(i in 1:4){
+    x[i] <- (annualrate[[n]][i+1]*(i+1)-annualrate[[n]][1])/(i) # by forward rate formula (R2T2-R1T1)/(T2-T1), since we want calculate for year 1 to 5 each year, we just add 1 in the first i to get R2 and T2.
   }
   return (x)
 }
 
-fwdlist <- list()
-for(i in 1:10){
-  fwdlist[[i]] <- fwdrate(i)
-}
-
 fyears <- c(1,2,3,4)
-plot(fyears, fwdlist[[1]], type="l", main = "forward rate curves", xlab = "years" ,ylab = "rates")
-for( i in 2:10){
-  lines(fyears, fwdlist[[i]], type = "l", col = i)
-}
+plot(fyears, fwdrate(1), type="o", main = "forward rate curves", xlab = "years" ,ylab = "rates", col=1)
+lines(fyears, fwdrate(2), type = "o", col = 2)
+lines(fyears, fwdrate(3), type = "o", col = 3)
+lines(fyears, fwdrate(4), type = "o", col = 4)
+lines(fyears, fwdrate(5), type = "o", col = 5)
+lines(fyears, fwdrate(6), type = "o", col = 6)
+lines(fyears, fwdrate(7), type = "o", col = 7)
+lines(fyears, fwdrate(8), type = "o", col = 8)
+lines(fyears, fwdrate(9), type = "o", col = 9)
+lines(fyears, fwdrate(10), type = "o", col = 10)
 legend("bottomright", legend = dates, col = 1:4, lty = 1, cex = 0.6)
 
 ```
 
 ```{r 5 ytm cov matrix}
-matrixy <- function(n){
-  x <- c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0) 
-  for (i in 1:10) {
-    x[i]<-as.numeric(as.vector(log(n[i+1]/n[i])))
+ytmm <- function(x){
+  ytmma <- matrix(nrow=10,ncol=1)
+  for(n in 1:9){
+    ytmma[n,1] <- log(ytm(n+1)[2*x+1]/ytm(n)[2*x+1])#since ytm is calculated by every half year, and we are asked to calculate year 1 to 5, so we will start at spot 3 and calculate the year after that.
   }
-  return(x)
+  return(ytmma)
 }
-mlist <- list()
-for(i in 1:10){
-  mlist[[i]] <- matrixy(ytmlist[[i]])
-}
-ytmmatrix <- matrix(unlist(mlist), ncol = 10)
-covytm <- cov(ytmmatrix)
+ytmmatrix <- data.frame(cbind(ytmm(1),ytmm(2),ytmm(3),ytmm(4),ytmm(5)))
+covytm <- cov(ytmmatrix[1:9,])
 covytm
 ```
 
 ```{r 5 cov forward rate}
-fwdmatrix <- matrix(nrow=10,ncol=4)
-for(i in 1:4){
+fwdm <- function(x){
+  fwdma <- matrix(nrow=10,ncol=1)
   for(n in 1:9){
-    fwdmatrix[n,i] <- log(fwdlist[[n+1]][i]/fwdlist[[n]][i])
+    fwdma[n,1] <- log(fwdrate(n+1)[x]/fwdrate(n)[x])# we calculate forward rate already year to year, so here just add one by one.
   }
+  return(fwdma)
 }
+fwdmatrix <- data.frame(cbind(fwdm(1),fwdm(2),fwdm(3),fwdm(4)))
+
 covfwd <- cov(fwdmatrix[1:9,])
 covfwd
 ```
 
 ```{r 6 eigenvalue and eigenvector}
 eigenforytm <- eigen(covytm)
-print("EIGENVALUE and EIGENVECTOR FOR COVARIANCE OF YTM")
-print(eigenforytm)
+eigenforytm
 
 eigenforfwd <- eigen(covfwd)
-print("EIGENVALUE and EIGENVECTOR FOR COVARIANCE OF FORWARD RATE")
-print(eigenforfwd)
+eigenforfwd
 ```
 
 
