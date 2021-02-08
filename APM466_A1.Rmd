@@ -1,0 +1,181 @@
+---
+title: "APM466 A1"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r read data}
+library(readxl)
+library(jrvFinance)
+library(tidyverse)
+
+
+bond <- read_excel('C:/Users/Zhi/Desktop/data.xlsx')
+bonds <- bond[which(bond$picked=='x'),]
+
+dates <- c("2021-01-18", "2021-01-19", "2021-01-20", "2021-01-21", "2021-01-22", "2021-01-25", "2021-01-26", "2021-01-27", "2021-01-28", "2021-01-29")
+coupons <- c(bonds%>% pull(2))
+m <- c(bonds%>% pull(4))
+mdates<-NULL
+for(i in 1:11){
+  mdates <- append(mdates,as.Date(m[i], format= '%m/%d/%Y'))
+}
+price18 <-c(bonds%>% pull(5))
+price19 <- c(bonds%>% pull(6))
+price20 <- c(bonds%>% pull(7))
+price21 <- c(bonds%>% pull(8))
+price22 <- c(bonds%>% pull(9))
+price25 <- c(bonds%>% pull(10))
+price26 <- c(bonds%>% pull(11))
+price27 <- c(bonds%>% pull(12))
+price28 <- c(bonds%>% pull(13))
+price29 <- c(bonds%>% pull(14))
+pricelist <- list(price18, price19, price20, price21, price22, price25, price26, price27, price28, price29)
+
+```
+
+
+```{r 4a calculate the YTM}
+ytm <- function(n){
+  x <- NULL
+  for(i in 1:11){
+    x <- append(x,bond.yield(settle=dates[n],mature=mdates[i],coupon = coupons[i], price = pricelist[[n]][i], redemption_value = 100))
+  }
+  return(x)
+}
+
+ytmlist <- list()
+for(i in 1:10){
+  ytmlist[[i]] <- ytm(i)
+}
+
+year <- c(0,0.5,1,1.5,2,2.5,3,3.5,4,4.5,5)
+plot(year, ytmlist[[1]], type="l", main = "ytmcurves", xlab ="years" ,ylab = "yield to maturity")
+for( i in 1:10){
+  lines(year, ytmlist[[i]], type = "l", col = i)
+}
+legend("topleft", legend = dates, col = 1:10, lty = 1, cex = 0.8)
+
+```
+
+```{r 4b calculate the spot rate}
+spotrate <- function(n){
+  x <- NULL
+  for(i in 1:11){
+    CF <- 0
+    if (i==1){
+      x[1] <- -log(pricelist[[n]][i]/(100 + 50 * coupons[1]))/yearFraction(dates[n], mdates[1])
+    }
+    else{
+      for (u in 1:(i-1)){
+        p <- 50*coupons[i]*exp(-x[u]*(yearFraction(dates[n], mdates[i])-0.5*(u)))
+        CF <- CF + p
+      }
+      x <- append(x,-log((pricelist[[n]][i]-CF)/(100 + 50*coupons[i]))/yearFraction(dates[n], mdates[i]))
+    }
+  }
+  return (x)
+}
+
+spotratelist <- list()
+for(i in 1:10){
+  spotratelist[[i]] <- spotrate(i)
+}
+
+plot(year, spotratelist[[1]], type="l", main = "spot rates", xlab ="years" ,ylab = "rates")
+for( i in 1:10){
+  lines(year, spotratelist[[i]], type = "l", col = i)
+}
+legend("topright", legend = dates, col = 1:10, lty = 1, cex = 0.6)
+
+```
+
+
+```{r 4c calculate the forward rate}
+library(rlist)
+annualrate <- list()
+for (i in 1:10){
+  annualrate[[i]] <- list.append(spotratelist[[i]][3],spotratelist[[i]][5],spotratelist[[i]][7],spotratelist[[i]][9],spotratelist[[i]][11]) 
+}
+
+fwdrate <- function(n){
+  x <- NULL
+  for(i in 2:5){
+    x[i-1] <- (annualrate[[n]][i]*i-annualrate[[n]][1])/(i - 1)
+  }
+  return (x)
+}
+
+fwdlist <- list()
+for(i in 1:10){
+  fwdlist[[i]] <- fwdrate(i)
+}
+
+fyears <- c(1,2,3,4)
+plot(fyears, fwdlist[[1]], type="l", main = "forward rate curves", xlab = "years" ,ylab = "rates")
+for( i in 2:10){
+  lines(fyears, fwdlist[[i]], type = "l", col = i)
+}
+legend("bottomright", legend = dates, col = 1:4, lty = 1, cex = 0.6)
+
+```
+
+```{r 5 ytm cov matrix}
+matrixy <- function(n){
+  x <- c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0) 
+  for (i in 1:10) {
+    x[i]<-as.numeric(as.vector(log(n[i+1]/n[i])))
+  }
+  return(x)
+}
+mlist <- list()
+for(i in 1:10){
+  mlist[[i]] <- matrixy(ytmlist[[i]])
+}
+ytmmatrix <- matrix(unlist(mlist), ncol = 10)
+covytm <- cov(ytmmatrix)
+covytm
+```
+
+```{r 5 cov forward rate}
+fwdmatrix <- matrix(nrow=10,ncol=4)
+for(i in 1:4){
+  for(n in 1:9){
+    fwdmatrix[n,i] <- log(fwdlist[[n+1]][i]/fwdlist[[n]][i])
+  }
+}
+covfwd <- cov(fwdmatrix[1:9,])
+covfwd
+```
+
+```{r 6 eigenvalue and eigenvector}
+eigenforytm <- eigen(covytm)
+print("EIGENVALUE and EIGENVECTOR FOR COVARIANCE OF YTM")
+print(eigenforytm)
+
+eigenforfwd <- eigen(covfwd)
+print("EIGENVALUE and EIGENVECTOR FOR COVARIANCE OF FORWARD RATE")
+print(eigenforfwd)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
