@@ -18,8 +18,8 @@ bond <- read_excel('data.xlsx')
 bonds <- bond[which(bond$picked=='x'),]
 
 dates <- c("2021-01-18", "2021-01-19", "2021-01-20", "2021-01-21", "2021-01-22", "2021-01-25", "2021-01-26", "2021-01-27", "2021-01-28", "2021-01-29")
-coupons <- c(bonds%>% pull(2))
-m <- c(bonds%>% pull(4))
+coupons <- c(bonds%>% pull(3))
+m <- c(bonds%>% pull(5))
 maturitydates<-NULL
 for(i in 1:11){
   maturitydates <- append(maturitydates,as.Date(m[i], format= '%m/%d/%Y'))
@@ -32,7 +32,7 @@ for(i in 1:11){
 ytm <- function(n){
   x <- NULL
   for(i in 1:11){
-    x <- append(x,bond.yield(settle=dates[n],coupon = coupons[i], mature=maturitydates[i],price = c(bonds%>% pull(n+4))[i], redemption_value = 100)) # formula to calculate the ytm by jrvfinance
+    x <- append(x,bond.yield(settle=dates[n],coupon = coupons[i], mature=maturitydates[i],price = c(bonds%>% pull(n+5))[i], redemption_value = 100)) # formula to calculate the ytm by jrvfinance
   }
   return(x)
 }
@@ -57,13 +57,13 @@ legend("topright", legend = dates, col = 1:10, lty = 1, cex = 0.6)
 spotrate <- function(n){
   x <- NULL
   for(i in 2:11){
-    x[1] <- -log(c(bonds%>% pull(n+4))[1]/(100 + 0.5*100 * coupons[1]))/yearFraction(dates[n], maturitydates[1]) #since the first one will not pay cash flows, so just calculated outside of the loop.
+    x[1] <- -log(c(bonds%>% pull(n+5))[1]/(100 + 0.5*100* coupons[1]))/yearFraction(dates[n], maturitydates[1]) #since at the time 0 will not pay cash flows, so just calculated outside of the loop.
     CF <- 0
     for (u in 1:(i-1)){
         p <- 0.5*100*coupons[i]*exp(-x[u]*(yearFraction(dates[n], maturitydates[i])-0.5*(u))) # calculate the cash flow of the bond, since the face value is 100, and I calculate p1 outside of the loop, so the mdates here should - 0.5*time.
-        CF <- CF + p
+        CF <- CF + p #sum up all CF till the given time
     }
-    x <- append(x,-log((c(bonds%>% pull(n+4))[i]-CF)/(100 + 0.5*100*coupons[i]))/yearFraction(dates[n], maturitydates[i])) #price - cash flows, then use the function -log(price/(100+coupon*100))/time to calculate the rate
+    x <- append(x,-log((c(bonds%>% pull(n+5))[i]-CF)/(100 + 0.5*100*coupons[i]))/yearFraction(dates[n], maturitydates[i])) #price - cash flows, then use the function -log(price/(100+coupon*100))/time to calculate the rate
   }
   return (x)
 }
@@ -88,7 +88,7 @@ library(rlist)
 annualrate <- list()
 for (i in 1:10){
   annualrate[[i]] <- list.append(spotrate(i)[3],spotrate(i)[5],spotrate(i)[7],spotrate(i)[9],spotrate(i)[11]) 
-} # since the spot rate is interest at that spot date, and annual rate is just the day in each year, I calculated spot rate simiannualy, so for annual rate I will just get the code from the spot rate
+} # since the spot rate is interest at that spot date, and annual rate is just the day in each year, I calculated spot rate simiannualy, so for annual rate I will just get the code from the spot rate, and by the year data I assign, year 1 is in the 3rd of the year data, and so on. 
 
 fwdrate <- function(n){
   x <- NULL
@@ -109,7 +109,7 @@ lines(fyears, fwdrate(7), type = "o", col = 7)
 lines(fyears, fwdrate(8), type = "o", col = 8)
 lines(fyears, fwdrate(9), type = "o", col = 9)
 lines(fyears, fwdrate(10), type = "o", col = 10)
-legend("bottomright", legend = dates, col = 1:4, lty = 1, cex = 0.6)
+legend("bottomright", legend = dates, col = 1:4, lty = 1, cex = 0.7)
 
 ```
 
@@ -122,7 +122,7 @@ ytmm <- function(x){
   return(ytmma)
 }
 ytmmatrix <- data.frame(cbind(ytmm(1),ytmm(2),ytmm(3),ytmm(4),ytmm(5)))
-covytm <- cov(ytmmatrix[1:9,])
+covytm <- cov(ytmmatrix[1:9,]) #10th will be NA, without creating a meaning less cov matrix, just ignore 10th one.
 covytm
 ```
 
